@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+
+# Set Colors
+PACKAGE=dockerwifi
+VERSION=0.1
+
+MAGENTA='\e[0;35m'
+RED='\e[0;31m'
+GREEN='\e[0;32m'
+BLUE='\e[0;34m'
+NC='\e[0m'
+
+# Defaults
+CONFIG=./configs/default.conf
+DOCKER_IMAGE=dockersniff
+DOCKER_BUILDFILE=build/Dockerfile
+DS_CHANNEL=1
+
+clear
+
+cat <<EOF
+
+
+#####   ####   ####  #    # ###### #####   ####  #    # # ###### ###### 
+#    # #    # #    # #   #  #      #    # #      ##   # # #      #      
+#    # #    # #      ####   #####  #    #  ####  # #  # # #####  #####  
+#    # #    # #      #  #   #      #####       # #  # # # #      #      
+#    # #    # #    # #   #  #      #   #  #    # #   ## # #      #      
+#####   ####   ####  #    # ###### #    #  ####  #    # # #      #      
+
+
+
+EOF
+
+
+# Check for problematic services
+# Borrowed and modified from #aircrack
+function checkservices() {
+  systemctl stop network-manager
+  systemctl stop wpa_supplicant
+}
+
+if [ "$EUID" -ne 0 ]; then
+  echo -e "${RED}[ERROR]${NC} DockerSniff requires root. Exiting..."
+  exit
+fi
+
+# get interface
+while test $# -gt 0; do
+  case "$1" in
+    -h|--help)
+      echo "$PACKAGE - dockerized AP"
+      echo " "
+      echo "$PACKAGE [arguments]"
+      echo " "
+      echo "Argumentss:"
+      echo "-h, --help          show brief help"
+      echo "-i, --interface     specify an interface (required)"
+      echo "-c, --channel       channel number"
+      echo "--partial           attempt cracking partial handshakes"
+      echo "--version           print version"
+      exit 0
+      ;;
+    -i|--interface)
+      shift
+      if test $# -gt 0; then
+        export IFACE=$1
+      else
+        echo "Interface required. Exiting..."
+        exit 1
+      fi
+      shift
+      ;;
+    -c|--channel)
+      shift
+      if test $# -gt 0; then
+        export DS_CHANNEL=$1
+      else
+        echo "Channel argument provided without a number. Exiting..."
+        exit 1
+      fi
+      shift
+      ;;
+    --partial)
+      export PARTIAL=1
+      shift
+      ;;
+    --version)
+      echo $VERSION
+      exit 0
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+if [ -z "${IFACE}" ]; then
+  echo -e "${RED}[ERROR]${NC} No interface specified. Exiting..."
+  exit 1
+fi
+
+PHY=$(cat /sys/class/net/$IFACE/phy80211/name)
+
+# Check that docker is installed and running
+$(docker info > /dev/null 2>&1)
+if [[ $? -ne 0 ]]; then
+  echo -e ${RED}[ERROR]${NC} Docker daemon not found. Exiting...
+  exit 1
+fi
+
+echo -e "[+] Checking Docker Service:\t\t${GREEN}Success${NC}"
+
+if ! [ -e /sys/class/net/$IFACE ]; then
+  echo -e "${RED}[ERROR]${NC} The specified interface does not exist. Exiting..."
+  exit 1
+fi
+
+$(iw phy $PHY info | grep -qE "\* monitor\s*$")
+if [[ $? -eq 1 ]]; then
+  echo -e "${RED}[ERROR]${NC} $IFACE does not support Monitor Mode. Exiting..."
+  exit 1
+fi
+
+echo -e "[+] Checking support for Monitor Mode:\t${GREEN}Success${NC}"
+CHANNELS=$(iw phy $PHY info | sed -n '/Frequencies/,/^\s*Supported commands:\s*$/{//!p}' | grep -vE "disabled" | grep -oP '\[\K[^]]+' | awk 'BEGIN {ORS=" "} {print}')
+echo -e "[+] Supported Channels: ${GREEN}$CHANNELS${NC}"
+
+# Get current status of card
+MODE=$(iw dev | grep -A5 $IFACE | grep type | cut -d" " -f2)
+if [[ $MODE == "monitor" ]]; then
+  echo -e "${BLUE}[INFO]${NC} Radio mode: ${RED}Monitor${NC}"
+elif [[ $MODE == "managed" ]]; then
+  echo -e "${BLUE}[INFO]${NC} Radio mode: ${RED}Managed${NC}"
+  echo -e "${MAGENTA}[!]${NC} Radio will be set to ${GREEN}Monitor Mode${NC}"
+elif [[ $MODE == "AP" ]]; then
+  echo -e "[+] Radio mode: ${GREEN}AP${NC}"
+  echo -e "${MAGENTA}[!]${NC} Radio will be set to ${GREEN}Monitor Mode${NC}"
+else
+  echo -e "${RED}[ERROR]${NC} Unknown Radio state: ${RED}$MODE${NC}. Exiting..."
+  exit 1
+fi
+
+echo -e "[+] Building the docker image ${GREEN}$DOCKER_IMAGE${NC}..."
+docker build --build-arg CONFIG=${CONFIG} -q --rm -t $DOCKER_IMAGE -f $DOCKER_BUILDFILE . > /dev/null
+if [[ $? -ne 0 ]]; then
+  echo -e "${RED}[ERROR]${NC} Error building ${RED}$DOCKER_IMAGE${NC}. Exiting..."
+  exit 1
+fi
+echo -e "[+] Successfully built docker image: ${GREEN}$DOCKER_IMAGE${NC}"
+
+echo -e "[+] Bringing down network management services..."
+checkservices
+
+DOCKER_NAME="dockersniff_$IFACE"
+echo -e "${MAGENTA}[!] Executing container: ${DOCKER_NAME}...${NC}"
+docker run -it --rm --name $DOCKER_NAME -e "TERM=xterm-256color" -e DS_CHANNEL=${DS_CHANNEL} -e IFACE=${IFACE} --net host --privileged $DOCKER_IMAGE
+
+
+
+echo -e "[+] Bringing up network managment services..."
+ip link set ${IFACE} down
+iw dev ${IFACE} set type managed
+ip link set ${IFACE} up
+systemctl restart wpa_supplicant
+systemctl restart network-manager
