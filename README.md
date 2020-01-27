@@ -1,8 +1,8 @@
-# DockerWIFI
+# DockerSniff
 
 ## Summary
 
-DockerWIFI is a dockerized hostapd/dhcp/iptables bundle that makes setting up and deploying software-based access points (APs) easy. 
+DockerSniff is a dockerized wpa capture device
 
 ## Dependencies
 
@@ -11,7 +11,7 @@ Docker
 ## Setup
 
 ```bash
-git clone https://github.com/wamacdonald89/dockerwifi.git
+git clone https://github.com/wamacdonald89/dockersniff.git
 ```
 
 ## Run
@@ -22,22 +22,15 @@ Arguments:
 
 **-c | --channel** <ch#>
 
-**--passphrase** <passphrase>
-
-**--ssid <AP Name>**
-
-**--config** <hostapd.conf>
-
 **-h** help
 
 **-v** Version
 
 ```bash
-sudo ./dockerwifi -i <interface> -c 36 --ssid dockerwifi --passphrase dockerwifi 
+sudo ./dockersniff -i <interface> -c <channel> 
 ```
 
 ## Notes
 
-- Currently only supports WPA2 networks but is fully configurable by modifying the config/default.conf file as you would hostapd.conf
-- Note: Network services may interfere with dockerwifi. It is suggested to disable services like Network-Manager it becomes an issue.
-
+Requires pyrit and a prebuilt pyrit sqlite database labeled pyrit.db in /pyrit/
+Will update to allow specifying database in command
