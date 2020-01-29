@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 from packet import Beacon
 from scapy.packet import *
@@ -13,6 +14,8 @@ bssids = {}
 wpa_handshakes = {}
 CHANNEL = os.environ['DS_CHANNEL'] or 1
 cracked_passwords = []
+iface = sys.argv[1]
+
 class EAPOLKey(Packet):
     name = "EAPOL - Key Descriptor Header"
     fields_desc = [ ByteEnumField("desc_type", 2, {1: "RC4", 2: "802.11", 254: "WPA"}),]
@@ -179,5 +182,5 @@ if __name__ == "__main__":
     stopFlag = Event()
     thread = TimerThread(stopFlag)
     thread.start()
-    sniff(iface="wlp2s0", prn=extract_data)
+    sniff(iface=iface, prn=extract_data)
     stopFlag.set()

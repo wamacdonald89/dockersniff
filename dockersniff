@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Set Colors
-PACKAGE=dockerwifi
+PACKAGE=dockersniff
 VERSION=0.1
 
 MAGENTA='\e[0;35m'
