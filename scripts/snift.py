@@ -86,6 +86,8 @@ def extract_data(packet):
             bssids[beacon.bssid]["BEACONS"] += 1
             if ssid_dec not in bssids[beacon.bssid]["SSIDS"]:
                 bssids[beacon.bssid]["SSIDS"].append(ssid_dec)
+            # Always keep track of latest beacon packet
+            bssids[beacon.bssid]["BEACON"] = packet
         else:
             bssids[beacon.bssid] = {
                 "BEACON": packet,

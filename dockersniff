@@ -57,8 +57,11 @@ while test $# -gt 0; do
       echo "-h, --help          show brief help"
       echo "-i, --interface     specify an interface (required)"
       echo "-c, --channel       channel number"
-      echo "--partial           attempt cracking partial handshakes"
+      echo "-b, --bssid         filter by bssid*"
+      echo "-e, --essid         filter by essid*"
+      echo "--partial           attempt cracking partial handshakes*"
       echo "--version           print version"
+      echo "* Not implemented"
       exit 0
       ;;
     -i|--interface)
@@ -77,6 +80,26 @@ while test $# -gt 0; do
         export DS_CHANNEL=$1
       else
         echo "Channel argument provided without a number. Exiting..."
+        exit 1
+      fi
+      shift
+      ;;
+    -b|--bssid)
+      shift
+      if test $# -gt 0; then
+        export BSSID=$1
+      else
+        echo "BSSID option provided without argument. Exiting..."
+        exit 1
+      fi
+      shift
+      ;;
+    -e|--essid)
+      shift
+      if test $# -gt 0; then
+        export ESSID=$1
+      else
+        echo "ESSID option provided without argument. Exiting..."
         exit 1
       fi
       shift
@@ -154,7 +177,7 @@ checkservices
 
 DOCKER_NAME="dockersniff_$IFACE"
 echo -e "${MAGENTA}[!] Executing container: ${DOCKER_NAME}...${NC}"
-docker run -it --rm --name $DOCKER_NAME -e "TERM=xterm-256color" -e DS_CHANNEL=${DS_CHANNEL} -e IFACE=${IFACE} --net host --privileged $DOCKER_IMAGE
+docker run -it --rm --name $DOCKER_NAME -e "TERM=xterm-256color" -e DS_CHANNEL=${DS_CHANNEL} -e IFACE=${IFACE} -e ESSID=${ESSID} --net host --privileged $DOCKER_IMAGE
 
 
 
