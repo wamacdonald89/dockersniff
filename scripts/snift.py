@@ -13,6 +13,7 @@ from prettytable import PrettyTable
 bssids = {}
 wpa_handshakes = {}
 CHANNEL = os.environ['DS_CHANNEL'] or 1
+ESSID_FILTER = os.environ['ESSID'] or None
 cracked_passwords = []
 iface = sys.argv[1]
 
@@ -141,7 +142,8 @@ def extract_data(packet):
                     # Deduct 1 from partial and add 1 to full
                     bssids[bssid]["HANDSHAKE"]["PARTIAL"] -= 1
                     bssids[bssid]["HANDSHAKE"]["FULL"] += 1
-                    _write_pcap(bssids[bssid]['BEACON'],bssids[bssid]["HANDSHAKE"], bssid, bssids[bssid]["HANDSHAKE"]["FULL"])
+                    if ESSID_FILTER == None or any(ESSID_FILTER in ssid for ssid in bssids[bssid]["SSIDS"]):
+                        _write_pcap(bssids[bssid]['BEACON'],bssids[bssid]["HANDSHAKE"], bssid, bssids[bssid]["HANDSHAKE"]["FULL"])
         except Exception as e:
             print("Error: %s" % e)
             exit(1) 
@@ -164,15 +166,16 @@ def refreshScreen():
     print("DOCKERSNIFF - CH: {}".format(CHANNEL))
     t = PrettyTable(["BSSID", "SSID(S)", "BEACONS", "Partial", "Full"])
     for bssid in bssids:
-        ssids = ",".join(bssids[bssid]["SSIDS"])
-        beacons = bssids[bssid]["BEACONS"] if bssids[bssid]["BEACONS"] < 9001 else "Over 9000"
-        t.add_row([
-            bssid, 
-            ssids, 
-            beacons,
-            bssids[bssid]["HANDSHAKE"]["PARTIAL"],
-            bssids[bssid]["HANDSHAKE"]["FULL"]
-        ])
+        if ESSID_FILTER == None or any(ESSID_FILTER in ssid for ssid in bssids[bssid]["SSIDS"]):
+            ssids = ",".join(bssids[bssid]["SSIDS"])
+            beacons = bssids[bssid]["BEACONS"] if bssids[bssid]["BEACONS"] < 9001 else "Over 9000"
+            t.add_row([
+                bssid, 
+                ssids, 
+                beacons,
+                bssids[bssid]["HANDSHAKE"]["PARTIAL"],
+                bssids[bssid]["HANDSHAKE"]["FULL"]
+            ])
     print(t)
     cracked_p = "\nPASSWORDS\n==========================================\n"
     for password in cracked_passwords:
